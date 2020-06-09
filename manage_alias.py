@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# INSERT INTO forwardings (address, forwarding,domain,
-# dest_domain,is_list, active) VALUES ('benjamin@rwx-berlin.de',
+# INSERT INTO forwardings (address, forwarding,domain, dest_domain,is_list, active) 
+# VALUES ('benjamin@rwx-berlin.de',
 # 'bkubitz@rwx-berlin.de', 'rwx-berlin.de', 'rwx-berlin.de',1, 1);
+
 import argparse
 import datetime
 from getpass import getpass
+import sys
 import mysql.connector as mariadb
-
+# from mysql.connector import errorcode
 
 def mysql_login():
     user_name = input('DB Username: ')
@@ -30,15 +32,22 @@ def get_alias(domain):
     # create cursor object
     cursor = mariadb_connection.cursor()
     # execute query
-    cursor.execute(sql_query_cmd)
-    # save result set to variable
-    alias = cursor.fetchall()
-    # close connection curser object
-    cursor.close()
-    # close the connection
-    mariadb_connection.close()
-    # return the result
-    return alias
+    try:
+        cursor.execute(sql_query_cmd)
+        alias = cursor.fetchall()
+    except mariadb_connection.Error as err:
+        print('[ERROR] Unable to fetch alias for Domain {0} '.format(domain))
+        print('MySql error {}'.format(err))
+        sys.exit(1)
+    finally:
+        if mariadb_connection.is_connected():
+            cursor.close()
+            mariadb_connection.close()
+            print('[INFO] connection is closed')
+    if alias is not None:
+        return alias
+    else:
+        return None
 
 
 def add_alias(address, domain):
@@ -55,12 +64,56 @@ def add_alias(address, domain):
         database='vmail')
     # create cursor object
     cursor = mariadb_connection.cursor()
-    # insert values to DB
-    cursor.execute(sql_insert_alias_cmd)
-    # do a DB commit
-    cursor.commit()
+    try:
+        # insert values to DB
+        cursor.execute(sql_insert_alias_cmd)
+        # do a DB commit
+        cursor.commit()
+        print('Alias {} inserted succesfully'.format(address))
+    except mariadb_connection.Error as err:
+        print('Unable to insert Alias {} to Domain {}'.format(address, domain))
+        print('[ERROR] {}').format(err)
+        # do rollback operation
+        print('Performing rollback')
+        mariadb_connection.rollback()
+    finally:
+        if mariadb_connection.is_connected():
+            cursor.close()
+            mariadb_connection.close()
+            print('[INFO] connection is closed')
 
-    print(cursor.rowcount, "was inserted.")
+def add_forwarding(address, forwarding, domain):
+    login_data = mysql_login()
+    # INSERT INTO forwardings (address, forwarding, domain, dest_domain,is_list, active)
+    sql_insert_forwarding_cmd = (
+        "INSERT INTO forwardings " 
+        "(address, forwarding, domain, dest_domain,is_list, active) "
+        "VALUES ('%s', '%s', '%s' '%s', 1, 1)") % (address, forwarding, domain, domain)
+      
+    # create connection object
+    mariadb_connection = mariadb.connect(
+        user=login_data[0],
+        password=login_data[1],
+        database='vmail')
+    # create cursor object
+    cursor = mariadb_connection.cursor()
+    try:
+        # insert values to DB
+        cursor.execute(sql_insert_forwarding_cmd)
+        # do a DB commit
+        cursor.commit()
+        print('Mailforwarding {} created succesfully'.format(address))
+    except mariadb_connection.Error as err:
+        print('Unable to insert Mailforwarding {} to Domain {}'.format(address, domain))
+        print('[ERROR] {}').format(err)
+        # do rollback operation
+        print('Performing rollback')
+        mariadb_connection.rollback()
+    finally:
+        if mariadb_connection.is_connected():
+            cursor.close()
+            mariadb_connection.close()
+            print('[INFO] connection is closed')
 
 
 if __name__ == "__main__":
@@ -86,7 +139,7 @@ if __name__ == "__main__":
         '-r',
         '--remove',
         action='store_true',
-        help='Remove mail alias to table alias and create destination entry in table forwardings ')
+        help='Remove mail alias in table alias and remove destination entry in table forwardings ')
     parser.add_argument(
         '-ft',
         '--forward-to',
@@ -94,11 +147,13 @@ if __name__ == "__main__":
         help='The email-address to forward mails to alias -> real address')
 
     global ARGS
-
     ARGS = parser.parse_args()
-
-    domain = ARGS.domain
-
+    
     if ARGS.list:
-        domain_alias = get_alias(domain)
+        domain_alias = get_alias(ARGS.domain)
         print(domain_alias)
+    
+    if ARGS.add:
+        add_alias(ARGS.address, ARGS.domain)
+        add_forwarding(ARGS.address, ARGS.forwarding, ARGS.domain)
+
