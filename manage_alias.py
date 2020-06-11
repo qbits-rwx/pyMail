@@ -10,7 +10,7 @@ import datetime
 from getpass import getpass
 import sys
 import mysql.connector as mariadb
-# from mysql.connector import errorcode
+from mysql.connector import errorcode
 
 def mysql_login():
     user_name = input('DB Username: ')
@@ -43,7 +43,6 @@ def get_alias(domain):
         if mariadb_connection.is_connected():
             cursor.close()
             mariadb_connection.close()
-            print('[INFO] connection is closed')
     if alias is not None:
         return alias
     else:
@@ -68,8 +67,8 @@ def add_alias(address, domain):
         # insert values to DB
         cursor.execute(sql_insert_alias_cmd)
         # do a DB commit
-        cursor.commit()
-        print('Alias {} inserted succesfully'.format(address))
+        mariadb_connection.commit()
+        print('[INFO] Alias {} inserted succesfully'.format(address))
     except mariadb_connection.Error as err:
         print('Unable to insert Alias {} to Domain {}'.format(address, domain))
         print('[ERROR] {}').format(err)
@@ -80,7 +79,6 @@ def add_alias(address, domain):
         if mariadb_connection.is_connected():
             cursor.close()
             mariadb_connection.close()
-            print('[INFO] connection is closed')
 
 def add_forwarding(address, forwarding, domain):
     login_data = mysql_login()
@@ -88,8 +86,8 @@ def add_forwarding(address, forwarding, domain):
     sql_insert_forwarding_cmd = (
         "INSERT INTO forwardings " 
         "(address, forwarding, domain, dest_domain,is_list, active) "
-        "VALUES ('%s', '%s', '%s' '%s', 1, 1)") % (address, forwarding, domain, domain)
-      
+        "VALUES ('%s', '%s', '%s', '%s', 1, 1)") % (address, forwarding, domain, domain)
+    
     # create connection object
     mariadb_connection = mariadb.connect(
         user=login_data[0],
@@ -101,8 +99,8 @@ def add_forwarding(address, forwarding, domain):
         # insert values to DB
         cursor.execute(sql_insert_forwarding_cmd)
         # do a DB commit
-        cursor.commit()
-        print('Mailforwarding {} created succesfully'.format(address))
+        mariadb_connection.commit()
+        print('[INFO] Mailforwarding {} created succesfully'.format(address))
     except mariadb_connection.Error as err:
         print('Unable to insert Mailforwarding {} to Domain {}'.format(address, domain))
         print('[ERROR] {}').format(err)
@@ -113,7 +111,6 @@ def add_forwarding(address, forwarding, domain):
         if mariadb_connection.is_connected():
             cursor.close()
             mariadb_connection.close()
-            print('[INFO] connection is closed')
 
 
 if __name__ == "__main__":
@@ -129,31 +126,28 @@ if __name__ == "__main__":
         '--domain',
         required=True,
         default='rwx-berlin.de')
-    parser.add_argument('-l', '--list', action='store_true')
     parser.add_argument(
         '-a',
-        '--add',
-        action='store_true',
-        help='Add mail alias to table alias and create destination entry in table forwardings ')
+        '--action',
+        required=True,
+        help='Add or remove mail alias')
     parser.add_argument(
-        '-r',
-        '--remove',
-        action='store_true',
-        help='Remove mail alias in table alias and remove destination entry in table forwardings ')
+        '--address',
+        help='The mail alias to create')
     parser.add_argument(
-        '-ft',
-        '--forward-to',
-        action='store_true',
+        '-f',
+        '--forwarding',
         help='The email-address to forward mails to alias -> real address')
 
     global ARGS
     ARGS = parser.parse_args()
     
-    if ARGS.list:
+    if ARGS.action == 'list':
         domain_alias = get_alias(ARGS.domain)
         print(domain_alias)
-    
-    if ARGS.add:
+
+    if ARGS.action == 'add':
         add_alias(ARGS.address, ARGS.domain)
         add_forwarding(ARGS.address, ARGS.forwarding, ARGS.domain)
+
 
