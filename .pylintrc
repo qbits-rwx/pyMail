@@ -1,0 +1,4 @@
+[MESSAGES CONTROL]
+disable=C0325, # Unnecessary parens after %r keyword
+        C0114, # missing-module-docstring
+        C0116, # missing-function-docstring
