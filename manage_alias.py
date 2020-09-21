@@ -46,7 +46,7 @@ def get_alias(domain):
         return None
 
 
-def add_alias(address, domain):
+def add_alias(address, domain, forwarding):
     login_data = mysql_login()
     # INSERT INTO alias (address, domain, active) VALUES
     # ('benjamin@rwx-berlin.de', 'rwx-berlin.de', 1);
@@ -157,7 +157,7 @@ if __name__ == "__main__":
             print(alias[0])
 
     elif ARGS.action == 'add':
-        add_alias(ARGS.address, ARGS.domain)
+        add_alias(ARGS.address, ARGS.domain, ARGS.forwarding)
     
     elif ARGS.action == 'remove':
         remove_alias(ARGS.address)
